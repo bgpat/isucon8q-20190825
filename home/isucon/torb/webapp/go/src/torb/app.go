@@ -618,9 +618,7 @@ func main() {
 
 			client.HSet(eventIDString, sheetIDString, jsonData)
 
-			if err := updateUserTotalPrice(user); err != nil {
-				return errors.WithStack(err)
-			}
+			go updateUserTotalPrice(user)
 
 			break
 		}
@@ -696,9 +694,7 @@ func main() {
 		sheetIDString := strconv.FormatInt(sheet.ID, 10)
 		client.HDel(eventIDString, sheetIDString)
 
-		if err := updateUserTotalPrice(user); err != nil {
-			return errors.WithStack(err)
-		}
+		go updateUserTotalPrice(user)
 
 		return c.NoContent(204)
 	}, loginRequired)
