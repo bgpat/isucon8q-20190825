@@ -427,6 +427,7 @@ func main() {
 						continue
 					}
 					client.HSet(eventIDString, sheetIDString, jsonData)
+				} else if err == sql.ErrNoRows {
 				} else {
 					return nil
 				}
