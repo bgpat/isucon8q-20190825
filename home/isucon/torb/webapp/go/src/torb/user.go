@@ -29,29 +29,9 @@ func getUser(c echo.Context) error {
 		return err
 	}
 
-	rows, err := db.Query("SELECT event_id FROM reservations WHERE user_id = ? GROUP BY event_id ORDER BY MAX(IFNULL(canceled_at, reserved_at)) DESC LIMIT 5", user.ID)
+	recentEvents, err := getRecentSheets(user)
 	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	var recentEvents []*Event
-	for rows.Next() {
-		var eventID int64
-		if err := rows.Scan(&eventID); err != nil {
-			return err
-		}
-		event, err := getEvent(eventID, -1)
-		if err != nil {
-			return err
-		}
-		for k := range event.Sheets {
-			event.Sheets[k].Detail = nil
-		}
-		recentEvents = append(recentEvents, event)
-	}
-	if recentEvents == nil {
-		recentEvents = make([]*Event, 0)
+		return errors.WithStack(err)
 	}
 
 	return c.JSON(200, echo.Map{
@@ -101,4 +81,32 @@ func getRecentEvents(user User) ([]Reservation, error) {
 		recentReservations = make([]Reservation, 0)
 	}
 	return recentReservations, nil
+}
+
+func getRecentSheets(user User) ([]*Event, error) {
+	rows, err := db.Query("SELECT event_id FROM reservations WHERE user_id = ? GROUP BY event_id ORDER BY MAX(IFNULL(canceled_at, reserved_at)) DESC LIMIT 5", user.ID)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	defer rows.Close()
+
+	var recentEvents []*Event
+	for rows.Next() {
+		var eventID int64
+		if err := rows.Scan(&eventID); err != nil {
+			return nil, errors.WithStack(err)
+		}
+		event, err := getEvent(eventID, -1)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+		for k := range event.Sheets {
+			event.Sheets[k].Detail = nil
+		}
+		recentEvents = append(recentEvents, event)
+	}
+	if recentEvents == nil {
+		recentEvents = make([]*Event, 0)
+	}
+	return recentEvents, nil
 }
