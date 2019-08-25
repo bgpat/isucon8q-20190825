@@ -388,57 +388,36 @@ func main() {
 		}
 
 		client.FlushAll()
-		rowsEvent, err := db.Query("SELECT id FROM events")
+
+		rowsReservations, err := db.Query("SELECT * FROM reservations WHERE canceled_at IS NULL")
 		if err != nil {
 			return nil
 		}
-		defer rowsEvent.Close()
-		for rowsEvent.Next() {
-			var eventID int64
-			if err := rowsEvent.Scan(&eventID); err != nil {
+		for rowsReservations.Next() {
+			var reservation Reservation
+			if err = rowsReservations.Scan(&reservation.ID, &reservation.EventID, &reservation.SheetID, &reservation.UserID, &reservation.ReservedAt, &reservation.CanceledAt); err != nil {
 				return nil
 			}
 
-			rows, err := db.Query("SELECT * FROM sheets ORDER BY `rank`, num")
-
+			eventIDString := "event" + strconv.FormatInt(reservation.EventID, 10)
+			sheetIDString := strconv.FormatInt(reservation.SheetID, 10)
+			jsonData, err := (&ReservationsRedisType{
+				UserID:     reservation.UserID,
+				ReservedAt: *reservation.ReservedAt,
+			}).Marshal()
 			if err != nil {
-				return nil
+				log.Println("re-try: rollback by", err)
+				continue
 			}
-			defer rows.Close()
+			client.HSet(eventIDString, sheetIDString, jsonData)
 
-			for rows.Next() {
-				var sheet Sheet
-				if err := rows.Scan(&sheet.ID, &sheet.Rank, &sheet.Num, &sheet.Price); err != nil {
-					return nil
-				}
-
-				var reservation Reservation
-
-				err := db.QueryRow("SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND canceled_at IS NULL GROUP BY event_id, sheet_id HAVING reserved_at = MIN(reserved_at)", eventID, sheet.ID).Scan(&reservation.ID, &reservation.EventID, &reservation.SheetID, &reservation.UserID, &reservation.ReservedAt, &reservation.CanceledAt)
-				if err == nil {
-					eventIDString := "event" + strconv.FormatInt(eventID, 10)
-					sheetIDString := strconv.FormatInt(sheet.ID, 10)
-					jsonData, err := (&ReservationsRedisType{
-						UserID:     reservation.UserID,
-						ReservedAt: *reservation.ReservedAt,
-					}).Marshal()
-					if err != nil {
-						log.Println("re-try: rollback by", err)
-						continue
-					}
-					client.HSet(eventIDString, sheetIDString, jsonData)
-
-					userIDString := "user_eventids" + strconv.FormatInt(reservation.UserID, 10)
-					client.ZAdd(userIDString, redis.Z{
-						Score:  (float64)(reservation.ReservedAt.UnixNano()),
-						Member: reservation.EventID,
-					})
-				} else if err == sql.ErrNoRows {
-				} else {
-					return nil
-				}
-			}
+			userIDString := "user_eventids" + strconv.FormatInt(reservation.UserID, 10)
+			client.ZAdd(userIDString, redis.Z{
+				Score:  (float64)(reservation.ReservedAt.UnixNano()),
+				Member: reservation.EventID,
+			})
 		}
+
 		return c.NoContent(204)
 	})
 	e.POST("/api/users", func(c echo.Context) error {
