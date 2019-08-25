@@ -11,7 +11,7 @@ deploy:
 
 result: log/kataribe.log
 	mysqldumpslow -s t /var/lib/mysql/slow.log > /home/isucon/torb/webapp/go/log/slow.log
-	dd if=/home/isucon/torb/webapp/go/log/slow.log bs=1024 count=1 | slackcat --channel slowlog
+	dd if=/home/isucon/torb/webapp/go/log/slow.log bs=10k count=1 | slackcat --channel slowlog
 
 log/kataribe.log: /var/log/h2o/access.log
 	./kataribe -conf kataribe.toml < $< > $@
