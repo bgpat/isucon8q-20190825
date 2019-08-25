@@ -49,14 +49,39 @@ duration_index = 10
 
 # You can aggregate requests by regular expression
 # For overview of regexp syntax: https://golang.org/pkg/regexp/syntax/
-[[bundle]]
-regexp = '^(GET|HEAD) /memo/[0-9]+\b'
-name = "get memo"
 
 [[bundle]]
-regexp = '^(GET|HEAD) /stylesheets/'
-name = "stylesheets"
+regexp = '^(GET|HEAD) /(favicon.ico|css|img|js)/'
+name = "static"
 
 [[bundle]]
-regexp = '^(GET|HEAD) /images/'
-name = "images"
+regexp = '^(GET|POST) /bench'
+name = "bench"
+
+[[bundle]]
+regexp = '^(GET|HEAD) /api/users/\d+'
+name = "GET /api/users/:id"
+
+[[bundle]]
+regexp = '^(GET|HEAD) /api/events/\d+'
+name = "GET /api/events/:id"
+
+[[bundle]]
+regexp = '^POST /api/events/\d+/actions/reserve'
+name = "POST /api/events/:id/actions/reserve"
+
+[[bundle]]
+regexp = '^(GET|HEAD) /admin/api/events/\d+'
+name = "GET /admin/api/events/:id"
+
+[[bundle]]
+regexp = '^POST /admin/api/events/\d+/actions/edit'
+name = "GET /admin/api/events/:id/actions/edit"
+
+[[bundle]]
+regexp = '^(GET|HEAD) /admin/api/reports/events/\d+/sales'
+name = "GET /admin/api/reports/events/:id/sales"
+
+[[bundle]]
+regexp = '^DELETE /api/events/\d+/sheets/[A-Z]/\d+/reservation'
+name = "GET /api/events/:event_id/sheets/:rank/:sheet_id/reservation"
