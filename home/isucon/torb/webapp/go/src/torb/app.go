@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-redis/redis"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/sessions"
 	"github.com/labstack/echo"
@@ -248,13 +249,34 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 		event.Total++
 		event.Sheets[sheet.Rank].Total++
 
-		var reservation Reservation
-		err := db.QueryRow("SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND canceled_at IS NULL GROUP BY event_id, sheet_id HAVING reserved_at = MIN(reserved_at)", event.ID, sheet.ID).Scan(&reservation.ID, &reservation.EventID, &reservation.SheetID, &reservation.UserID, &reservation.ReservedAt, &reservation.CanceledAt)
+		//var reservation Reservation
+		//err := db.QueryRow("SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND canceled_at IS NULL GROUP BY event_id, sheet_id HAVING reserved_at = MIN(reserved_at)", event.ID, sheet.ID).Scan(&reservation.ID, &reservation.EventID, &reservation.SheetID, &reservation.UserID, &reservation.ReservedAt, &reservation.CanceledAt)
+		//if err == nil {
+		//	sheet.Mine = reservation.UserID == loginUserID
+		//	sheet.Reserved = true
+		//	sheet.ReservedAtUnix = reservation.ReservedAt.Unix()
+		//} else if err == sql.ErrNoRows {
+		//	event.Remains++
+		//	event.Sheets[sheet.Rank].Remains++
+		//} else {
+		//	return nil, err
+		//}
+
+		eventIDString := "event" + strconv.FormatInt(event.ID, 10)
+		sheetIDString := strconv.FormatInt(sheet.ID, 10)
+		jsonData, err := client.HGet(eventIDString, sheetIDString).Result()
 		if err == nil {
-			sheet.Mine = reservation.UserID == loginUserID
+			s := ([]byte)(jsonData)
+
+			redisType, err := UnmarshalReservationsRedisType(s)
+			if err != nil {
+				return nil, err
+			}
+
+			sheet.Mine = redisType.UserID == loginUserID
 			sheet.Reserved = true
-			sheet.ReservedAtUnix = reservation.ReservedAt.Unix()
-		} else if err == sql.ErrNoRows {
+			sheet.ReservedAtUnix = redisType.ReservedAt.Unix()
+		} else if err == redis.Nil {
 			event.Remains++
 			event.Sheets[sheet.Rank].Remains++
 		} else {
@@ -308,6 +330,7 @@ func (r *Renderer) Render(w io.Writer, name string, data interface{}, c echo.Con
 }
 
 var db *sql.DB
+var client *redis.Client
 
 func main() {
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&charset=utf8mb4",
@@ -321,6 +344,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	client = redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
 
 	e := echo.New()
 	funcs := template.FuncMap{
@@ -358,6 +387,52 @@ func main() {
 			return nil
 		}
 
+		client.FlushAll()
+		rowsEvent, err := db.Query("SELECT id FROM events")
+		if err != nil {
+			return nil
+		}
+		defer rowsEvent.Close()
+		for rowsEvent.Next() {
+			var eventID int64
+			if err := rowsEvent.Scan(&eventID); err != nil {
+				return nil
+			}
+
+			rows, err := db.Query("SELECT * FROM sheets ORDER BY `rank`, num")
+
+			if err != nil {
+				return nil
+			}
+			defer rows.Close()
+
+			for rows.Next() {
+				var sheet Sheet
+				if err := rows.Scan(&sheet.ID, &sheet.Rank, &sheet.Num, &sheet.Price); err != nil {
+					return nil
+				}
+
+				var reservation Reservation
+
+				err := db.QueryRow("SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND canceled_at IS NULL GROUP BY event_id, sheet_id HAVING reserved_at = MIN(reserved_at)", eventID, sheet.ID).Scan(&reservation.ID, &reservation.EventID, &reservation.SheetID, &reservation.UserID, &reservation.ReservedAt, &reservation.CanceledAt)
+				if err == nil {
+					eventIDString := "event" + strconv.FormatInt(eventID, 10)
+					sheetIDString := strconv.FormatInt(sheet.ID, 10)
+					jsonData, err := (&ReservationsRedisType{
+						UserID:     reservation.UserID,
+						ReservedAt: *reservation.ReservedAt,
+					}).Marshal()
+					if err != nil {
+						log.Println("re-try: rollback by", err)
+						continue
+					}
+					client.HSet(eventIDString, sheetIDString, jsonData)
+				} else if err == sql.ErrNoRows {
+				} else {
+					return nil
+				}
+			}
+		}
 		return c.NoContent(204)
 	})
 	e.POST("/api/users", func(c echo.Context) error {
@@ -599,8 +674,8 @@ func main() {
 			if err != nil {
 				return err
 			}
-
-			res, err := tx.Exec("INSERT INTO reservations (event_id, sheet_id, user_id, reserved_at) VALUES (?, ?, ?, ?)", event.ID, sheet.ID, user.ID, time.Now().UTC().Format("2006-01-02 15:04:05.000000"))
+			now := time.Now()
+			res, err := tx.Exec("INSERT INTO reservations (event_id, sheet_id, user_id, reserved_at) VALUES (?, ?, ?, ?)", event.ID, sheet.ID, user.ID, now.UTC().Format("2006-01-02 15:04:05.000000"))
 			if err != nil {
 				tx.Rollback()
 				log.Println("re-try: rollback by", err)
@@ -617,6 +692,18 @@ func main() {
 				log.Println("re-try: rollback by", err)
 				continue
 			}
+
+			eventIDString := "event" + strconv.FormatInt(event.ID, 10)
+			sheetIDString := strconv.FormatInt(sheet.ID, 10)
+			jsonData, err := (&ReservationsRedisType{
+				UserID:     user.ID,
+				ReservedAt: now,
+			}).Marshal()
+			if err != nil {
+				log.Println("re-try: rollback by", err)
+				continue
+			}
+			client.HSet(eventIDString, sheetIDString, jsonData)
 
 			break
 		}
@@ -687,6 +774,10 @@ func main() {
 		if err := tx.Commit(); err != nil {
 			return err
 		}
+
+		eventIDString := "event" + strconv.FormatInt(event.ID, 10)
+		sheetIDString := strconv.FormatInt(sheet.ID, 10)
+		client.HDel(eventIDString, sheetIDString)
 
 		return c.NoContent(204)
 	}, loginRequired)
@@ -950,4 +1041,21 @@ func resError(c echo.Context, e string, status int) error {
 		status = 500
 	}
 	return c.JSON(status, map[string]string{"error": e})
+}
+
+// https://app.quicktype.io?share=2WajM4u0zaBc1oKh6q7e
+
+func UnmarshalReservationsRedisType(data []byte) (ReservationsRedisType, error) {
+	var r ReservationsRedisType
+	err := json.Unmarshal(data, &r)
+	return r, err
+}
+
+func (r *ReservationsRedisType) Marshal() ([]byte, error) {
+	return json.Marshal(r)
+}
+
+type ReservationsRedisType struct {
+	UserID     int64     `json:"user_id"`
+	ReservedAt time.Time `json:"reserved_at"`
 }
