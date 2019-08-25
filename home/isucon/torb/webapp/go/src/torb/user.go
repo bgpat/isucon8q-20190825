@@ -87,7 +87,7 @@ func getRecentEvents(user User) ([]Reservation, error) {
 
 func getRecentSheets(user User) ([]*Event, error) {
 	userIDString := "user_eventids" + strconv.FormatInt(user.ID, 10)
-	eventIDs, err := client.ZRevRange(userIDString, 0, 5).Result()
+	eventIDs, err := client.ZRevRange(userIDString, 0, 4).Result()
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
