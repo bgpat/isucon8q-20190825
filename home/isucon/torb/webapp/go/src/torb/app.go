@@ -605,7 +605,6 @@ func main() {
 			}).Marshal()
 			if err != nil {
 				log.Println("re-try: rollback by", err)
-				continue
 			}
 			client.HSet(eventIDString, sheetIDString, jsonData)
 
