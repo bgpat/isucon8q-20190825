@@ -8,3 +8,9 @@
 /etc/systemd/*
 !/etc/systemd/system.conf
 
+# /etc/my.cnf
+/*
+!/etc
+/etc/*
+!/etc/my.cnf
+
