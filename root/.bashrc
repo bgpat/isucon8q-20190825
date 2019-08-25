@@ -12,3 +12,5 @@ if [ -f /etc/bashrc ]; then
 fi
 
 [[ -s "/root/.gvm/scripts/gvm" ]] && source "/root/.gvm/scripts/gvm"
+
+export GO111MODULE=on
