@@ -262,7 +262,7 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 		//	return nil, err
 		//}
 
-		eventIDString := strconv.FormatInt(event.ID, 10)
+		eventIDString := "event" + strconv.FormatInt(event.ID, 10)
 		sheetIDString := strconv.FormatInt(sheet.ID, 10)
 		jsonData, err := client.HGet(eventIDString, sheetIDString).Result()
 		if err == nil {
@@ -387,6 +387,7 @@ func main() {
 			return nil
 		}
 
+		client.FlushAll()
 		rowsEvent, err := db.Query("SELECT id FROM events")
 		if err != nil {
 			return nil
@@ -415,7 +416,7 @@ func main() {
 
 				err := db.QueryRow("SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND canceled_at IS NULL GROUP BY event_id, sheet_id HAVING reserved_at = MIN(reserved_at)", eventID, sheet.ID).Scan(&reservation.ID, &reservation.EventID, &reservation.SheetID, &reservation.UserID, &reservation.ReservedAt, &reservation.CanceledAt)
 				if err == nil {
-					eventIDString := strconv.FormatInt(eventID, 10)
+					eventIDString := "event" + strconv.FormatInt(eventID, 10)
 					sheetIDString := strconv.FormatInt(sheet.ID, 10)
 					jsonData, err := (&ReservationsRedisType{
 						UserID:     reservation.UserID,
@@ -691,7 +692,7 @@ func main() {
 				continue
 			}
 
-			eventIDString := strconv.FormatInt(event.ID, 10)
+			eventIDString := "event" + strconv.FormatInt(event.ID, 10)
 			sheetIDString := strconv.FormatInt(sheet.ID, 10)
 			jsonData, err := (&ReservationsRedisType{
 				UserID:     user.ID,
@@ -773,7 +774,7 @@ func main() {
 			return err
 		}
 
-		eventIDString := strconv.FormatInt(event.ID, 10)
+		eventIDString := "event" + strconv.FormatInt(event.ID, 10)
 		sheetIDString := strconv.FormatInt(sheet.ID, 10)
 		client.HDel(eventIDString, sheetIDString)
 
