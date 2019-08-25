@@ -427,6 +427,12 @@ func main() {
 						continue
 					}
 					client.HSet(eventIDString, sheetIDString, jsonData)
+
+					userIDString := "user_eventids" + strconv.FormatInt(reservation.UserID, 10)
+					client.ZAdd(userIDString, &redis.Z{
+						Score:  (float64)(reservation.ReservedAt.UnixNano()),
+						Member: reservation.EventID,
+					})
 				} else if err == sql.ErrNoRows {
 				} else {
 					return nil
@@ -704,6 +710,12 @@ func main() {
 				continue
 			}
 			client.HSet(eventIDString, sheetIDString, jsonData)
+
+			userIDString := "user_eventids" + strconv.FormatInt(user.ID, 10)
+			client.ZAdd(userIDString, &redis.Z{
+				Score:  (float64)(now.UnixNano()),
+				Member: event.ID,
+			})
 
 			break
 		}
