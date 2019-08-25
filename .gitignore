@@ -54,3 +54,15 @@
 /etc/systemd/system/*
 !/etc/systemd/system/torb.perl.service
 
+# /home/isucon/torb/db/schema.sql
+/*
+!/home
+/home/*
+!/home/isucon
+/home/isucon/*
+!/home/isucon/torb
+/home/isucon/torb/*
+!/home/isucon/torb/db
+/home/isucon/torb/db/*
+!/home/isucon/torb/db/schema.sql
+
