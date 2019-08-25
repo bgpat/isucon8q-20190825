@@ -10,11 +10,9 @@ import (
 	"io"
 	"log"
 	"os"
-	"os/exec"
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/go-redis/redis"
@@ -379,54 +377,7 @@ func main() {
 			"origin": c.Scheme() + "://" + c.Request().Host,
 		})
 	}, fillinUser)
-	e.GET("/initialize", func(c echo.Context) error {
-		cmd := exec.Command("../../db/init.sh")
-		cmd.Stdin = os.Stdin
-		cmd.Stdout = os.Stdout
-		err := cmd.Run()
-		if err != nil {
-			return nil
-		}
-
-		client.FlushAll()
-
-		rowsReservations, err := db.Query("SELECT * FROM reservations")
-		if err != nil {
-			return nil
-		}
-
-		var wg sync.WaitGroup
-		for rowsReservations.Next() {
-			var reservation Reservation
-			if err = rowsReservations.Scan(&reservation.ID, &reservation.EventID, &reservation.SheetID, &reservation.UserID, &reservation.ReservedAt, &reservation.CanceledAt); err != nil {
-				return nil
-			}
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				eventIDString := "event" + strconv.FormatInt(reservation.EventID, 10)
-				sheetIDString := strconv.FormatInt(reservation.SheetID, 10)
-				jsonData, err := (&ReservationsRedisType{
-					UserID:     reservation.UserID,
-					ReservedAt: *reservation.ReservedAt,
-				}).Marshal()
-				if err != nil {
-					log.Println("re-try: rollback by", err)
-					return
-				}
-				client.HSet(eventIDString, sheetIDString, jsonData)
-
-				userIDString := "user_eventids" + strconv.FormatInt(reservation.UserID, 10)
-				client.ZAdd(userIDString, redis.Z{
-					Score:  (float64)(reservation.ReservedAt.UnixNano()),
-					Member: reservation.EventID,
-				})
-			}()
-		}
-		wg.Wait()
-
-		return c.NoContent(204)
-	})
+	e.GET("/initialize", initialize)
 	e.POST("/api/users", func(c echo.Context) error {
 		var params struct {
 			Nickname  string `json:"nickname"`
