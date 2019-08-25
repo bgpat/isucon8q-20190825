@@ -24,9 +24,9 @@ func getUser(c echo.Context) error {
 		return errors.WithStack(err)
 	}
 
-	var totalPrice int
-	if err := db.QueryRow("SELECT IFNULL(SUM(e.price + s.price), 0) FROM reservations r INNER JOIN sheets s ON s.id = r.sheet_id INNER JOIN events e ON e.id = r.event_id WHERE r.user_id = ? AND r.canceled_at IS NULL", user.ID).Scan(&totalPrice); err != nil {
-		return err
+	totalPrice, err := calculateUserTotalPrice(user)
+	if err != nil {
+		return errors.WithStack(err)
 	}
 
 	recentEvents, err := getRecentSheets(user)
@@ -109,4 +109,9 @@ func getRecentSheets(user User) ([]*Event, error) {
 		recentEvents = make([]*Event, 0)
 	}
 	return recentEvents, nil
+}
+
+func calculateUserTotalPrice(user User) (price int, err error) {
+	err = db.QueryRow("SELECT IFNULL(SUM(e.price + s.price), 0) FROM reservations r INNER JOIN sheets s ON s.id = r.sheet_id INNER JOIN events e ON e.id = r.event_id WHERE r.user_id = ? AND r.canceled_at IS NULL", user.ID).Scan(&price)
+	return
 }
