@@ -689,6 +689,12 @@ func main() {
 		sheetIDString := strconv.FormatInt(sheet.ID, 10)
 		client.HDel(eventIDString, sheetIDString)
 
+		userIDString := "user_eventids" + strconv.FormatInt(reservation.UserID, 10)
+		client.ZAdd(userIDString, redis.Z{
+			Score:  (float64)(reservation.ReservedAt.UnixNano()),
+			Member: reservation.EventID,
+		})
+
 		return c.NoContent(204)
 	}, loginRequired)
 	e.GET("/admin/", func(c echo.Context) error {
