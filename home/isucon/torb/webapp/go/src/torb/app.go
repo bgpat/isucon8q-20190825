@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -22,6 +21,7 @@ import (
 	"github.com/labstack/echo"
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/middleware"
+	"github.com/pkg/errors"
 )
 
 type User struct {
@@ -615,7 +615,12 @@ func main() {
 				log.Println("re-try: rollback by", err)
 				continue
 			}
+
 			client.HSet(eventIDString, sheetIDString, jsonData)
+
+			if err := updateUserTotalPrice(user); err != nil {
+				return errors.WithStack(err)
+			}
 
 			break
 		}
@@ -690,6 +695,10 @@ func main() {
 		eventIDString := "event" + strconv.FormatInt(event.ID, 10)
 		sheetIDString := strconv.FormatInt(sheet.ID, 10)
 		client.HDel(eventIDString, sheetIDString)
+
+		if err := updateUserTotalPrice(user); err != nil {
+			return errors.WithStack(err)
+		}
 
 		return c.NoContent(204)
 	}, loginRequired)

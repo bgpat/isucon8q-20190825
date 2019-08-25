@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/labstack/echo"
 	"github.com/pkg/errors"
 )
@@ -24,7 +26,7 @@ func getUser(c echo.Context) error {
 		return errors.WithStack(err)
 	}
 
-	totalPrice, err := calculateUserTotalPrice(user)
+	totalPrice, err := getUserTotalPrice(&user)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -111,7 +113,34 @@ func getRecentSheets(user User) ([]*Event, error) {
 	return recentEvents, nil
 }
 
-func calculateUserTotalPrice(user User) (price int, err error) {
+func calculateUserTotalPrice(user *User) (price int, err error) {
 	err = db.QueryRow("SELECT IFNULL(SUM(e.price + s.price), 0) FROM reservations r INNER JOIN sheets s ON s.id = r.sheet_id INNER JOIN events e ON e.id = r.event_id WHERE r.user_id = ? AND r.canceled_at IS NULL", user.ID).Scan(&price)
 	return
+}
+
+func updateUserTotalPrice(user *User) error {
+	price, err := calculateUserTotalPrice(user)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	err = client.Set(userTotalPriceKey(user), price, 0).Err()
+	return errors.WithStack(err)
+}
+
+func userTotalPriceKey(user *User) string {
+	return fmt.Sprintf("price_%v", user.ID)
+}
+
+func getUserTotalPrice(user *User) (int, error) {
+	v := client.Get(userTotalPriceKey(user))
+	if err := v.Err(); err != nil {
+		price, err2 := calculateUserTotalPrice(user)
+		if err2 != nil {
+			return 0, errors.WithStack(err)
+		}
+		client.Set(userTotalPriceKey(user), price, 0).Err()
+		return price, nil
+	}
+	price, err := v.Int()
+	return price, errors.WithStack(err)
 }
