@@ -40,10 +40,10 @@ func initialize(c echo.Context) error {
 			return err
 		}
 
-		if _, ok := events[reservation.UserID]; !ok {
-			events[reservation.UserID] = make(map[string]interface{})
+		if _, ok := events[reservation.EventID]; !ok {
+			events[reservation.EventID] = make(map[string]interface{})
 		}
-		events[reservation.UserID][sheetIDString] = string(jsonData)
+		events[reservation.EventID][sheetIDString] = string(jsonData)
 
 		userEvents[reservation.UserID] = append(userEvents[reservation.UserID], redis.Z{
 			Score:  (float64)(reservation.ReservedAt.UnixNano()),
