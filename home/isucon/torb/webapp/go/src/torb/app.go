@@ -429,7 +429,7 @@ func main() {
 					client.HSet(eventIDString, sheetIDString, jsonData)
 
 					userIDString := "user_eventids" + strconv.FormatInt(reservation.UserID, 10)
-					client.ZAdd(userIDString, &redis.Z{
+					client.ZAdd(userIDString, redis.Z{
 						Score:  (float64)(reservation.ReservedAt.UnixNano()),
 						Member: reservation.EventID,
 					})
@@ -624,7 +624,7 @@ func main() {
 			client.HSet(eventIDString, sheetIDString, jsonData)
 
 			userIDString := "user_eventids" + strconv.FormatInt(user.ID, 10)
-			client.ZAdd(userIDString, &redis.Z{
+			client.ZAdd(userIDString, redis.Z{
 				Score:  (float64)(now.UnixNano()),
 				Member: event.ID,
 			})
