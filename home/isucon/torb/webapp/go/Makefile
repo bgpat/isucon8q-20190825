@@ -7,9 +7,15 @@ deploy:
 	systemctl start mariadb
 	systemctl start torb.go
 
-result:
+result: log/kataribe.log
 	mysqldumpslow -s t /var/lib/mysql/slow.log > /home/isucon/torb/webapp/go/log/slow.log
 	dd if=/home/isucon/torb/webapp/go/log/slow.log bs=1024 count=1 | slackcat --channel slowlog
+
+log/kataribe.log: /var/log/h2o/access.log
+	./kataribe -conf kataribe.toml < $< > $@
+	slackcat --channel kataribe < $@
+	rm -f $<
+	systemctl restart h2o
 
 .PHONY: clean
 clean:
