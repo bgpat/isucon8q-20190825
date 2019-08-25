@@ -14,3 +14,11 @@
 /etc/*
 !/etc/my.cnf
 
+# /etc/nginx/nginx.conf
+/*
+!/etc
+/etc/*
+!/etc/nginx
+/etc/nginx/*
+!/etc/nginx/nginx.conf
+
