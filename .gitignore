@@ -1,2 +1,10 @@
 *
 !.gitignore
+# /etc/systemd/system.conf
+/*
+!/etc
+/etc/*
+!/etc/systemd
+/etc/systemd/*
+!/etc/systemd/system.conf
+
