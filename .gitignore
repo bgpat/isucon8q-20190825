@@ -44,3 +44,13 @@
 /home/isucon/torb/webapp/go/*
 !/home/isucon/torb/webapp/go/kataribe.toml
 
+# /etc/systemd/system/torb.perl.service
+/*
+!/etc
+/etc/*
+!/etc/systemd
+/etc/systemd/*
+!/etc/systemd/system
+/etc/systemd/system/*
+!/etc/systemd/system/torb.perl.service
+
