@@ -22,3 +22,11 @@
 /etc/nginx/*
 !/etc/nginx/nginx.conf
 
+# /etc/h2o//default-h2o.conf
+/*
+!/etc
+/etc/*
+!/etc/h2o
+/etc/h2o/*
+!/etc/h2o/default-h2o.conf
+
