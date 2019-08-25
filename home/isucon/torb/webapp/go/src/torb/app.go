@@ -390,7 +390,7 @@ func main() {
 
 		client.FlushAll()
 
-		rowsReservations, err := db.Query("SELECT * FROM reservations WHERE canceled_at IS NULL")
+		rowsReservations, err := db.Query("SELECT * FROM reservations")
 		if err != nil {
 			return nil
 		}
