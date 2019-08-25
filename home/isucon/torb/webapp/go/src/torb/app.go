@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -23,6 +22,8 @@ import (
 	"github.com/labstack/echo"
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/middleware"
+	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
 )
 
 type User struct {
@@ -210,15 +211,24 @@ func getEvents(all bool) ([]*Event, error) {
 		}
 		events = append(events, &event)
 	}
+	var eg errgroup.Group
 	for i, v := range events {
-		event, err := getEvent(v.ID, -1)
-		if err != nil {
-			return nil, err
-		}
-		for k := range event.Sheets {
-			event.Sheets[k].Detail = nil
-		}
-		events[i] = event
+		i := i
+		v := v
+		eg.Go(func() error {
+			event, err := getEvent(v.ID, -1)
+			if err != nil {
+				return err
+			}
+			for k := range event.Sheets {
+				event.Sheets[k].Detail = nil
+			}
+			events[i] = event
+			return nil
+		})
+	}
+	if err := eg.Wait(); err != nil {
+		return nil, errors.WithStack(err)
 	}
 	return events, nil
 }
