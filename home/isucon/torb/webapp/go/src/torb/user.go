@@ -1,6 +1,8 @@
 package main
 
 import (
+	"strconv"
+
 	"github.com/labstack/echo"
 	"github.com/pkg/errors"
 )
@@ -84,16 +86,15 @@ func getRecentEvents(user User) ([]Reservation, error) {
 }
 
 func getRecentSheets(user User) ([]*Event, error) {
-	rows, err := db.Query("SELECT event_id FROM reservations WHERE user_id = ? GROUP BY event_id ORDER BY MAX(IFNULL(canceled_at, reserved_at)) DESC LIMIT 5", user.ID)
+	userIDString := "user_eventids" + strconv.FormatInt(user.ID, 10)
+	eventIDs, err := client.ZRange(userIDString, 0, 5).Result()
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	defer rows.Close()
-
 	var recentEvents []*Event
-	for rows.Next() {
-		var eventID int64
-		if err := rows.Scan(&eventID); err != nil {
+	for _, eventIDString := range eventIDs {
+		eventID, err := strconv.ParseInt(eventIDString, 10, 64)
+		if err != nil {
 			return nil, errors.WithStack(err)
 		}
 		event, err := getEvent(eventID, -1)
